@@ -127,4 +127,4 @@ try:
 
         st.caption("Fonte: Dados públicos de remuneração e receita das companhias abertas.")
     else:
-        st.warning("Não há dados disponíveis para os filtros selecion
+        st.warning("Não há dados disponíveis para os filtros selecionado.")
