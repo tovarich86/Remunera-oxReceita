@@ -94,7 +94,7 @@ if df is not None:
             empresas_selecionadas = st.sidebar.multiselect(
                 "Selecione a(s) Empresa(s)",
                 empresas_filtradas,
-                default=[]
+                default=available_options
             )
             if empresas_selecionadas:
                 df_filt = df_filt[df_filt["Nome_Companhia"].isin(empresas_selecionadas)]
