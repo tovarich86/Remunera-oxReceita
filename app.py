@@ -4,7 +4,7 @@ import plotly.express as px
 import requests
 import io
 
-st.set_page_config(page_title="Remuneração vs Receita", layout="wide")
+st.set_page_config(page_title="Remuneração vs Receita Bi", layout="wide")
 
 @st.cache_data
 def load_data(url):
@@ -157,8 +157,8 @@ if df is not None:
             df_plot = pd.DataFrame()
         else:
             df_plot = df_filt.dropna(subset=[remuneration_col, "Receita"]).copy()
-            x_axis_col = 'Receita'
-            x_axis_label = "Receita (R$)"
+            x_axis_col = 'Receita Bi'
+            x_axis_label = "Receita (R$ Bi)"
 
         if not df_plot.empty:
             st.subheader(f"Relação entre Receita e Remuneração {selected_rem_type}")
