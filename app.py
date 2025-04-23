@@ -215,7 +215,7 @@ if df is not None:
                     remuneration_col: "R$ {:,.2f}"
                 }))
 
-            st.caption("Fonte: Dados públicos CVM (Comissão de Valores Mobiliários) compilados.")
+            st.caption("Fonte: Dados públicos CVM (Comissão de Valores Mobiliários) compilados.Atenção: Esta aplicação é um protótipo e serve apenas para fins exploratórios e educacionais. Os dados e análises apresentados podem conter limitações, inconsistências ou desatualizações. Sempre valide informações antes de tomar decisões com base nestes resultados.")
 
         else:
             st.warning("Não há dados disponíveis para os filtros selecionados.")
