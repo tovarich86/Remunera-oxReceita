@@ -46,6 +46,7 @@ st.title("Dashboard Analítico: Remuneração vs Performance Corporativa")
 # Carregar dados
 github_url = "https://raw.githubusercontent.com/tovarich86/Remunera-oxReceita/main/remuneração%20faturamento.xlsx"
 df = load_data(github_url)
+numeric_cols = ["Receita", "Valor_Medio_Remuneracao", "Valor_Maior_Remuneracao", "Valor_Menor_Remuneracao"]
 
 if df is not None:
     try:
