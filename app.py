@@ -3,137 +3,229 @@ import pandas as pd
 import plotly.express as px
 import requests
 import io
-from streamlit_dynamic_filters import DynamicFilters
-from streamlit_plotly_events import plotly_events
 
-# Configuração da página
-st.set_page_config(page_title="Análise de Remuneração", layout="wide")
+st.set_page_config(page_title="Remuneração vs Receita", layout="wide")
 
-# --- Função de Carregamento de Dados com Tratamento Aprimorado ---
 @st.cache_data
 def load_data(url):
-    """
-    Carrega dados da URL fornecida com tratamento robusto de valores faltantes e conversão de tipos
-    """
     try:
         response = requests.get(url)
         response.raise_for_status()
-        
         df = pd.read_excel(io.BytesIO(response.content), sheet_name="fre_cia_aberta_remuneracao_maxi")
-        
-        # Conversão e tratamento de colunas numéricas
-        numeric_cols = ['Receita', 'Valor_Medio_Remuneracao', 
-                       'Valor_Maior_Remuneracao', 'Valor_Menor_Remuneracao']
-        
-        for col in numeric_cols:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-            df[col] = df[col].fillna(df[col].median())
-        
-        # Tratamento de datas
-        df['Ano'] = pd.to_datetime(df['Data_Fim_Exercicio_Social'], errors='coerce').dt.year
-        df = df.dropna(subset=['Ano'])
-        df['Ano'] = df['Ano'].astype(int)
-        
+        df["Ano"] = pd.to_datetime(df["Data_Fim_Exercicio_Social"], errors="coerce").dt.year
+        df.dropna(subset=["Ano"], inplace=True)
+        df["Ano"] = df["Ano"].astype(int)
         return df
-
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro ao baixar o arquivo do GitHub: {e}")
+        return None
+    except FileNotFoundError:
+        st.error(f"Erro: Aba 'fre_cia_aberta_remuneracao_maxi' não encontrada no arquivo Excel.")
+        return None
+    except KeyError as e:
+        st.error(f"Erro: Coluna esperada não encontrada no arquivo: {e}. Verifique o arquivo de origem.")
+        return None
     except Exception as e:
-        st.error(f"Erro ao carregar dados: {e}")
+        st.error(f"Ocorreu um erro inesperado ao carregar os dados: {e}")
         return None
 
-# --- Interface Principal ---
-st.title("Dashboard Analítico: Remuneração vs Performance Corporativa")
+st.title("Análise: Remuneração da Administração vs Receita da Companhia")
 
-# Carregar dados
 github_url = "https://raw.githubusercontent.com/tovarich86/Remunera-oxReceita/main/remuneração%20faturamento.xlsx"
 df = load_data(github_url)
-numeric_cols = ["Receita", "Valor_Medio_Remuneracao", "Valor_Maior_Remuneracao", "Valor_Menor_Remuneracao"]
 
 if df is not None:
     try:
-        # --- Barra Lateral com Filtros Avançados ---
         st.sidebar.header("Filtros Principais")
-        
-        # Filtro de Ano
         available_years = sorted(df["Ano"].unique(), reverse=True)
-        selected_year = st.sidebar.selectbox("Ano", available_years)
-        
-        # Filtro de Receita com Slider
-        min_rec, max_rec = int(df['Receita'].min()), int(df['Receita'].max())
-        faixa_receita = st.sidebar.slider("Faixa de Receita (R$)", min_rec, max_rec, (min_rec, max_rec))
-        df = df[(df['Receita'] >= faixa_receita[0]) & (df['Receita'] <= faixa_receita[1])]
-        
-        # Busca Textual
-        termo_busca = st.sidebar.text_input("Buscar Empresa:")
-        if termo_busca:
-            df = df[df['Nome_Companhia'].str.contains(termo_busca, case=False)]
-        
-        st.sidebar.markdown(f"**Empresas encontradas:** {len(df)}")
+        selected_year = st.sidebar.selectbox("Ano", available_years, index=0)
 
-        # --- Sistema de Abas ---
-        tab1, tab2, tab3 = st.tabs(["Visualização", "Filtros Dinâmicos", "Gestão de Dados"])
-        
-        with tab1:
-            # --- Gráfico Interativo ---
-            st.subheader("Análise Multidimensional")
-            
-            # Seleção de eixos e cores
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                x_axis = st.selectbox("Eixo X", numeric_cols, index=0)
-            with col2:
-                y_axis = st.selectbox("Eixo Y", numeric_cols, index=1)
-            with col3:
-                color_by = st.selectbox("Colorir por", ['Setor de ativdade', 'Especie_Controle_Acionario', 'Nome_Companhia'])
-            
-            fig = px.scatter(df, x=x_axis, y=y_axis, color=color_by,
-                            hover_data=['Nome_Companhia', 'ticker', 'Receita'],
-                            template="plotly_white")
-            
-            # Interatividade
-            selected_points = plotly_events(fig, select_event=True)
-            if selected_points:
-                selected_index = selected_points[0]['pointIndex']
-                empresa = df.iloc[selected_index]
-                with st.expander(f"Detalhes: {empresa['Nome_Companhia']}"):
-                    st.markdown(f"""
-                    **Ticker:** {empresa['ticker']}  
-                    **Setor:** {empresa['Setor de ativdade']}  
-                    **Receita:** R$ {empresa['Receita']:,.2f}  
-                    **Remuneração Média:** R$ {empresa['Valor_Medio_Remuneracao']:,.2f}
-                    """)
-            
+        available_organs = sorted(df["Orgao_Administracao"].dropna().unique())
+        selected_organ = st.sidebar.selectbox("Órgão Administrativo", available_organs, index=0)
+
+        selected_rem_type = st.sidebar.radio(
+            "Tipo de Remuneração",
+            ["Média", "Máxima", "Mínima"],
+            horizontal=True
+        )
+
+        st.sidebar.header("Filtros Adicionais")
+        filter_by = st.sidebar.radio(
+            "Agrupar/Colorir por:",
+            ["Nenhum", "Setor de Atividade", "Controle Acionário", "Empresa"],
+            index=1
+        )
+
+        df_filt = df[
+            (df["Ano"] == selected_year) &
+            (df["Orgao_Administracao"] == selected_organ)
+        ].copy()
+
+        # --------- Filtro por range de receita ----------
+        receita_min = float(df_filt["Receita"].min())
+        receita_max = float(df_filt["Receita"].max())
+        receita_range = st.sidebar.slider(
+            "Filtrar por Receita (R$)",
+            min_value=receita_min,
+            max_value=receita_max,
+            value=(receita_min, receita_max),
+            step=1000000.0,
+            format="R$ {:,.0f}"
+        )
+        df_filt = df_filt[(df_filt["Receita"] >= receita_range[0]) & (df_filt["Receita"] <= receita_range[1])]
+
+        # --------- Filtros Dinâmicos ---------
+        dynamic_filter_column = None
+        dynamic_selection = None
+        sector_col_name = "Setor de ativdade"  # Corrija para o nome exato se necessário
+
+        if filter_by == "Setor de Atividade":
+            dynamic_filter_column = sector_col_name
+            available_options = sorted(df_filt[dynamic_filter_column].dropna().unique())
+            dynamic_selection = st.sidebar.multiselect(
+                "Selecione o(s) Setor(es) de Atividade",
+                available_options,
+                default=[]
+            )
+            if dynamic_selection:
+                df_filt = df_filt[df_filt[dynamic_filter_column].isin(dynamic_selection)]
+            # Filtro de empresas após setor
+            empresas_filtradas = sorted(df_filt["Nome_Companhia"].dropna().unique())
+            empresas_selecionadas = st.sidebar.multiselect(
+                "Selecione a(s) Empresa(s)",
+                empresas_filtradas,
+                default=[]
+            )
+            if empresas_selecionadas:
+                df_filt = df_filt[df_filt["Nome_Companhia"].isin(empresas_selecionadas)]
+            else:
+                df_filt = df_filt[df_filt["Nome_Companhia"].isin([])]
+        elif filter_by == "Controle Acionário":
+            dynamic_filter_column = "Especie_Controle_Acionario"
+            available_options = sorted(df_filt[dynamic_filter_column].dropna().unique())
+            dynamic_selection = st.sidebar.multiselect(
+                "Selecione o(s) Controle(s) Acionário(s)",
+                available_options,
+                default=[]
+            )
+            if dynamic_selection:
+                df_filt = df_filt[df_filt[dynamic_filter_column].isin(dynamic_selection)]
+            empresas_filtradas = sorted(df_filt["Nome_Companhia"].dropna().unique())
+            empresas_selecionadas = st.sidebar.multiselect(
+                "Selecione a(s) Empresa(s)",
+                empresas_filtradas,
+                default=[]
+            )
+            if empresas_selecionadas:
+                df_filt = df_filt[df_filt["Nome_Companhia"].isin(empresas_selecionadas)]
+            else:
+                df_filt = df_filt[df_filt["Nome_Companhia"].isin([])]
+        elif filter_by == "Empresa":
+            dynamic_filter_column = "Nome_Companhia"
+            available_options = sorted(df_filt[dynamic_filter_column].dropna().unique())
+            dynamic_selection = st.sidebar.multiselect(
+                "Selecione a(s) Empresa(s)",
+                available_options,
+                default=[]
+            )
+            if dynamic_selection:
+                df_filt = df_filt[df_filt[dynamic_filter_column].isin(dynamic_selection)]
+            else:
+                df_filt = df_filt[df_filt[dynamic_filter_column].isin([])]
+
+        # --------- Seleção de Coluna de Remuneração ----------
+        if selected_rem_type == "Média":
+            remuneration_col = "Valor_Medio_Remuneracao"
+        elif selected_rem_type == "Máxima":
+            remuneration_col = "Valor_Maior_Remuneracao"
+        else:
+            remuneration_col = "Valor_Menor_Remuneracao"
+
+        required_cols = [remuneration_col, "Receita", "Nome_Companhia", "ticker"]
+        color_col = None
+        if filter_by == "Setor de Atividade":
+            color_col = sector_col_name
+            required_cols.append(sector_col_name)
+        elif filter_by == "Controle Acionário":
+            color_col = "Especie_Controle_Acionario"
+            required_cols.append("Especie_Controle_Acionario")
+        elif filter_by == "Empresa":
+            color_col = "Nome_Companhia"
+
+        missing_cols = [col for col in required_cols if col not in df_filt.columns]
+        if missing_cols:
+            st.warning(f"Colunas necessárias ausentes nos dados filtrados: {', '.join(missing_cols)}. Verifique o arquivo de origem ou os filtros.")
+            df_plot = pd.DataFrame()
+        else:
+            df_plot = df_filt.dropna(subset=[remuneration_col, "Receita"]).copy()
+            x_axis_col = 'Receita'
+            x_axis_label = "Receita (R$)"
+
+        if not df_plot.empty:
+            st.subheader(f"Relação entre Receita e Remuneração {selected_rem_type}")
+            st.markdown(f"**Ano:** {selected_year} | **Órgão:** {selected_organ}")
+
+            hover_data_config = {
+                "Nome_Companhia": True,
+                "ticker": True,
+                sector_col_name: True,
+                "Especie_Controle_Acionario": True,
+                x_axis_col: ':.2f',
+                remuneration_col: ':.2f'
+            }
+
+            fig = px.scatter(
+                df_plot,
+                x=x_axis_col,
+                y=remuneration_col,
+                color=color_col,
+                hover_name="Nome_Companhia",
+                hover_data=hover_data_config,
+                labels={
+                    x_axis_col: x_axis_label,
+                    remuneration_col: f"Remuneração {selected_rem_type} (R$)",
+                    color_col: filter_by if color_col else None
+                },
+                title=f"Remuneração {selected_rem_type} vs Receita ({selected_year}, {selected_organ})",
+                template="simple_white"
+            )
+
+            if len(df_plot) > 1:
+                try:
+                    fig_trend = px.scatter(df_plot, x=x_axis_col, y=remuneration_col, trendline="ols")
+                    fig.add_traces(fig_trend.data[1])
+                except Exception as trend_err:
+                    st.warning(f"Não foi possível calcular a linha de tendência: {trend_err}")
+
+            fig.update_traces(marker=dict(size=12, opacity=0.8), selector=dict(mode='markers'))
+            fig.update_layout(
+                height=600,
+                xaxis_title=x_axis_label,
+                yaxis_title=f"Remuneração {selected_rem_type} (R$)",
+                legend_title_text=filter_by if color_col else None
+            )
+
             st.plotly_chart(fig, use_container_width=True)
 
-        with tab2:
-            # --- Filtros Dinâmicos ---
-            st.header("Filtragem Avançada")
-            dynamic_filters = DynamicFilters(df, filters=['Setor de ativdade', 'Especie_Controle_Acionario'])
-            dynamic_filters.display_filters()
+            with st.expander("Ver dados detalhados (filtrados)"):
+                display_cols = ["Nome_Companhia", "ticker", sector_col_name,
+                                "Especie_Controle_Acionario", "Receita", remuneration_col]
+                display_cols_exist = [col for col in display_cols if col in df_plot.columns]
+                st.dataframe(df_plot[display_cols_exist].style.format({
+                    "Receita": "R$ {:,.2f}",
+                    remuneration_col: "R$ {:,.2f}"
+                }))
 
-        with tab3:
-            # --- Gestão de Dados ---
-            st.header("Operações em Massa")
-            
-            # Seleção de empresas
-            empresas = df['Nome_Companhia'].unique()
-            selecionadas = st.multiselect("Selecionar empresas:", empresas)
-            
-            # Ações
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Exportar Seleção", help="Exportar empresas selecionadas para CSV"):
-                    csv = df[df['Nome_Companhia'].isin(selecionadas)].to_csv(index=False)
-                    st.download_button("Baixar CSV", csv, "dados_selecionados.csv")
-            with col2:
-                if st.button("Excluir Seleção", type="primary"):
-                    df = df[~df['Nome_Companhia'].isin(selecionadas)]
-                    st.success(f"{len(selecionadas)} empresas removidas!")
+            st.caption("Fonte: Dados públicos CVM (Comissão de Valores Mobiliários) compilados.")
 
-            # Visualização rápida
-            st.dataframe(df.head(10), use_container_width=True)
+        else:
+            st.warning("Não há dados disponíveis para os filtros selecionados.")
 
+    except KeyError as e:
+        st.error(f"Erro de processamento: Uma coluna esperada ({e}) não foi encontrada nos dados filtrados. "
+                 f"Isso pode ocorrer se a estrutura do arquivo mudou ou se os filtros resultaram em dados incompletos.")
     except Exception as e:
-        st.error(f"Erro no processamento: {e}")
+        st.error(f"Ocorreu um erro inesperado durante o processamento ou visualização: {e}")
 
-else:
-    st.error("Falha ao carregar dados. Verifique a conexão e a URL.")
+elif df is None:
+    st.error("Não foi possível carregar os dados. Verifique a URL do arquivo e a conexão com a internet.")
