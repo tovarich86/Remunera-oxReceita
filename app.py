@@ -94,7 +94,7 @@ if df is not None:
 
         elif filter_by == "Controle Acionário":
             dynamic_filter_column = "Especie_Controle_Acionario"
-            available_options = sorted(df_filt[dynamic_filter_column].dropna().unique())
+            available_options = sorted(df_filt[dynamic_filter_column].dropna().astype(str).unique())
             controles_selecionados = st.sidebar.multiselect(
                 "Selecione o(s) Controle(s) Acionário(s)",
                 available_options,
@@ -102,7 +102,7 @@ if df is not None:
             )
             if controles_selecionados:
                 empresas_filtradas = sorted(
-                    df_filt[df_filt[dynamic_filter_column].isin(controles_selecionados)]["Nome_Companhia"].dropna().unique()
+                    df_filt[df_filt[dynamic_filter_column].astype(str).isin(controles_selecionados)]["Nome_Companhia"].dropna().unique()
                 )
             else:
                 empresas_filtradas = []
