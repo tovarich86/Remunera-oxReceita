@@ -61,79 +61,78 @@ if df is not None:
             (df["Orgao_Administracao"] == selected_organ)
         ].copy()
 
-        # --------- Filtro por range de receita ----------
-        receita_min = float(df_filt["Receita"].min())
-        receita_max = float(df_filt["Receita"].max())
-        receita_range = st.sidebar.slider(
-            "Filtrar por Receita (R$)",
-            min_value=receita_min,
-            max_value=receita_max,
-            value=(receita_min, receita_max),
-            step=1000000.0,
-            format="R$ {:,.0f}"
-        )
-        df_filt = df_filt[(df_filt["Receita"] >= receita_range[0]) & (df_filt["Receita"] <= receita_range[1])]
-
-        # --------- Filtros Dinâmicos ---------
         dynamic_filter_column = None
-        dynamic_selection = None
-        sector_col_name = "Setor de ativdade"  # Corrija para o nome exato se necessário
+        sector_col_name = "Setor de ativdade"  # Corrija se necessário
 
+        # Filtros dinâmicos conforme solicitado
         if filter_by == "Setor de Atividade":
             dynamic_filter_column = sector_col_name
             available_options = sorted(df_filt[dynamic_filter_column].dropna().unique())
-            dynamic_selection = st.sidebar.multiselect(
+            setores_selecionados = st.sidebar.multiselect(
                 "Selecione o(s) Setor(es) de Atividade",
                 available_options,
                 default=[]
             )
-            if dynamic_selection:
-                df_filt = df_filt[df_filt[dynamic_filter_column].isin(dynamic_selection)]
-            # Filtro de empresas após setor
-            empresas_filtradas = sorted(df_filt["Nome_Companhia"].dropna().unique())
+            if setores_selecionados:
+                empresas_filtradas = sorted(
+                    df_filt[df_filt[dynamic_filter_column].isin(setores_selecionados)]["Nome_Companhia"].dropna().unique()
+                )
+            else:
+                empresas_filtradas = []
             empresas_selecionadas = st.sidebar.multiselect(
                 "Selecione a(s) Empresa(s)",
                 empresas_filtradas,
-                default=available_options
+                default=empresas_filtradas
             )
-            if empresas_selecionadas:
-                df_filt = df_filt[df_filt["Nome_Companhia"].isin(empresas_selecionadas)]
+            if setores_selecionados and empresas_selecionadas:
+                df_filt = df_filt[
+                    (df_filt[dynamic_filter_column].isin(setores_selecionados)) &
+                    (df_filt["Nome_Companhia"].isin(empresas_selecionadas))
+                ]
             else:
-                df_filt = df_filt[df_filt["Nome_Companhia"].isin([])]
+                df_filt = df_filt.iloc[0:0]
+
         elif filter_by == "Controle Acionário":
             dynamic_filter_column = "Especie_Controle_Acionario"
             available_options = sorted(df_filt[dynamic_filter_column].dropna().unique())
-            dynamic_selection = st.sidebar.multiselect(
+            controles_selecionados = st.sidebar.multiselect(
                 "Selecione o(s) Controle(s) Acionário(s)",
                 available_options,
                 default=[]
             )
-            if dynamic_selection:
-                df_filt = df_filt[df_filt[dynamic_filter_column].isin(dynamic_selection)]
-            empresas_filtradas = sorted(df_filt["Nome_Companhia"].dropna().unique())
+            if controles_selecionados:
+                empresas_filtradas = sorted(
+                    df_filt[df_filt[dynamic_filter_column].isin(controles_selecionados)]["Nome_Companhia"].dropna().unique()
+                )
+            else:
+                empresas_filtradas = []
             empresas_selecionadas = st.sidebar.multiselect(
                 "Selecione a(s) Empresa(s)",
                 empresas_filtradas,
-                default=[]
+                default=empresas_filtradas
             )
-            if empresas_selecionadas:
-                df_filt = df_filt[df_filt["Nome_Companhia"].isin(empresas_selecionadas)]
+            if controles_selecionados and empresas_selecionadas:
+                df_filt = df_filt[
+                    (df_filt[dynamic_filter_column].isin(controles_selecionados)) &
+                    (df_filt["Nome_Companhia"].isin(empresas_selecionadas))
+                ]
             else:
-                df_filt = df_filt[df_filt["Nome_Companhia"].isin([])]
+                df_filt = df_filt.iloc[0:0]
+
         elif filter_by == "Empresa":
             dynamic_filter_column = "Nome_Companhia"
             available_options = sorted(df_filt[dynamic_filter_column].dropna().unique())
-            dynamic_selection = st.sidebar.multiselect(
+            empresas_selecionadas = st.sidebar.multiselect(
                 "Selecione a(s) Empresa(s)",
                 available_options,
                 default=[]
             )
-            if dynamic_selection:
-                df_filt = df_filt[df_filt[dynamic_filter_column].isin(dynamic_selection)]
+            if empresas_selecionadas:
+                df_filt = df_filt[df_filt[dynamic_filter_column].isin(empresas_selecionadas)]
             else:
-                df_filt = df_filt[df_filt[dynamic_filter_column].isin([])]
+                df_filt = df_filt.iloc[0:0]
 
-        # --------- Seleção de Coluna de Remuneração ----------
+        # Seleção da coluna de remuneração
         if selected_rem_type == "Média":
             remuneration_col = "Valor_Medio_Remuneracao"
         elif selected_rem_type == "Máxima":
