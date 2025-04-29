@@ -5,3 +5,4 @@ requests>=2.25.0
 streamlit-dynamic-filters
 streamlit-plotly-events
 openpyxl
+statsmodels
