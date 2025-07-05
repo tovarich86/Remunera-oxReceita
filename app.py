@@ -46,7 +46,8 @@ def load_csv_data(url, delimiter=';'):
         response = requests.get(url)
         response.raise_for_status()  # Levanta um erro para respostas HTTP ruins (4xx ou 5xx)
         # Decodifica o conteúdo da resposta para string e usa io.StringIO para ler como CSV
-        df_raw = pd.read_csv(io.StringIO(response.content.decode('utf-8')), delimiter=delimiter)
+        # Adicionado encoding='latin1' para lidar com caracteres especiais comuns em arquivos CSV brasileiros
+        df_raw = pd.read_csv(io.StringIO(response.content.decode('latin1')), delimiter=delimiter)
 
         # Padroniza nomes de colunas para facilitar o merge e a análise
         df_raw.columns = [col.replace(' ', '_').replace('-', '_').replace('(', '').replace(')', '').strip() for col in df_raw.columns]
