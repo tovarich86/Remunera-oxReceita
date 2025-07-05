@@ -35,17 +35,18 @@ def load_excel_sheet_data(url, sheet_name):
         st.error(f"Ocorreu um erro inesperado ao carregar os dados do Excel: {e}")
         return None
 
-# Função para carregar dados de arquivos CSV locais (do ambiente Canvas)
+# Função para carregar dados de arquivos CSV de uma URL do GitHub
 @st.cache_data
-def load_csv_data(file_id, delimiter=';'):
+def load_csv_data(url, delimiter=';'):
     """
-    Carrega dados de um arquivo CSV usando o content_fetcher.
+    Carrega dados de um arquivo CSV hospedado no GitHub.
     Processa a coluna de data para extrair o ano.
     """
     try:
-        # Usa content_fetcher para acessar o arquivo CSV carregado
-        # O contentFetchId é fornecido pelo ambiente Canvas para arquivos carregados
-        df_raw = pd.read_csv(f"uploaded:{file_id}", delimiter=delimiter)
+        response = requests.get(url)
+        response.raise_for_status()  # Levanta um erro para respostas HTTP ruins (4xx ou 5xx)
+        # Decodifica o conteúdo da resposta para string e usa io.StringIO para ler como CSV
+        df_raw = pd.read_csv(io.StringIO(response.content.decode('utf-8')), delimiter=delimiter)
 
         # Padroniza nomes de colunas para facilitar o merge e a análise
         df_raw.columns = [col.replace(' ', '_').replace('-', '_').replace('(', '').replace(')', '').strip() for col in df_raw.columns]
@@ -56,7 +57,7 @@ def load_csv_data(file_id, delimiter=';'):
         elif 'Data_Referencia' in df_raw.columns:
             df_raw["Ano"] = pd.to_datetime(df_raw["Data_Referencia"], errors="coerce").dt.year
         else:
-            st.warning(f"Coluna de data não encontrada em {file_id}. A análise por ano pode ser limitada.")
+            st.warning(f"Coluna de data não encontrada em {url}. A análise por ano pode ser limitada.")
             df_raw["Ano"] = None # Define como None se nenhuma coluna de data for encontrada
 
         if "Ano" in df_raw.columns:
@@ -64,23 +65,25 @@ def load_csv_data(file_id, delimiter=';'):
             df_raw["Ano"] = df_raw["Ano"].astype(int)
 
         return df_raw
-    except FileNotFoundError:
-        st.error(f"Erro: Arquivo '{file_id}' não encontrado. Certifique-se de que foi carregado corretamente.")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro ao baixar o arquivo CSV do GitHub ({url}): {e}")
         return None
     except Exception as e:
-        st.error(f"Ocorreu um erro inesperado ao carregar os dados de '{file_id}': {e}")
+        st.error(f"Ocorreu um erro inesperado ao carregar os dados de '{url}': {e}")
         return None
 
 st.title("Análise de Remuneração e Faturamento de Companhias Abertas")
 
-# Carregar o arquivo original de remuneração vs faturamento
-github_url = "https://raw.githubusercontent.com/tovarich86/Remunera-oxReceita/main/remuneração%20faturamento.xlsx"
-df_remuneracao_faturamento = load_excel_sheet_data(github_url, sheet_name="fre_cia_aberta_remuneracao_maxi")
+# URL base do repositório GitHub
+github_base_url = "https://raw.githubusercontent.com/tovarich86/Remunera-oxReceita/main/"
 
-# Carregar os novos arquivos CSV
-df_remuneracao_max_min_media = load_csv_data("fre_cia_aberta_remuneracao_maxima_minima_media_2025.csv")
-df_remuneracao_total_orgao = load_csv_data("fre_cia_aberta_remuneracao_total_orgao_2025.csv")
-df_remuneracao_variavel = load_csv_data("fre_cia_aberta_remuneracao_variavel_2025.csv")
+# Carregar o arquivo original de remuneração vs faturamento
+df_remuneracao_faturamento = load_excel_sheet_data(f"{github_base_url}remuneração%20faturamento.xlsx", sheet_name="fre_cia_aberta_remuneracao_maxi")
+
+# Carregar os novos arquivos CSV do GitHub
+df_remuneracao_max_min_media = load_csv_data(f"{github_base_url}fre_cia_aberta_remuneracao_maxima_minima_media_2025.csv")
+df_remuneracao_total_orgao = load_csv_data(f"{github_base_url}fre_cia_aberta_remuneracao_total_orgao_2025.csv")
+df_remuneracao_variavel = load_csv_data(f"{github_base_url}fre_cia_aberta_remuneracao_variavel_2025.csv")
 
 # Verificar se todos os dataframes foram carregados com sucesso
 if df_remuneracao_faturamento is None or \
@@ -273,4 +276,3 @@ else:
                f"Atenção: Esta aplicação é um protótipo e serve apenas para fins exploratórios e educacionais. "
                f"Os dados e análises apresentados podem conter limitações, inconsistências ou desatualizações. "
                f"Sempre valide informações antes de tomar decisões com base nestes resultados.")
-
